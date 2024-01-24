@@ -56,7 +56,7 @@ process BWA_ALIGNMENT {
 
     script:
     """
-    bwa mem -t $task.cpus $genome $reads \
+    bwa mem $genome $reads \
         | samtools view -b \
         > ${sample_id}.bam
     """
