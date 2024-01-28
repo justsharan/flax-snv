@@ -9,7 +9,8 @@ reference = Channel.fromPath(params.genome, checkIfExists: true)
 workflow {
     fastqc = FASTQC(reads)
     BWA_INDEX(reference)
-    BWA_ALIGNMENT(reads, BWA_INDEX.out.bwa_index.first())
+    bamfile = BWA_ALIGNMENT(reads, BWA_INDEX.out.bwa_index.first())
+    VARIANT_CALLING(reference, bamfile.collect())
     MULTIQC(fastqc.collect())
 }
 
@@ -52,7 +53,7 @@ process BWA_ALIGNMENT {
     tuple path(genome), path("*")
 
     output:
-    "*.bam"
+    path("${sample_id}.bam"), emit: bamfile
 
     script:
     """
@@ -60,6 +61,23 @@ process BWA_ALIGNMENT {
         | samtools view -b \
         > ${sample_id}.bam
     """
+}
+
+process VARIANT_CALLING {
+  tag "${bamfile.getBaseName()}"
+  publishDir "${params.outdir}/bcf", mode:"copy"
+
+  input:
+  file(genome)
+  file(bamfile)
+
+  output:
+  path("${bamfile.getBaseName()}.bcf")
+
+  script:
+  """
+    bcftools mpileup -Ou -f $genome $bamfile | bcftools call -mv --ploidy 2 -Ob -o ${bamfile.getBaseName()}.bcf
+  """
 }
 
 process MULTIQC {
