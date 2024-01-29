@@ -10,7 +10,8 @@ workflow {
     fastqc = FASTQC(reads)
     BWA_INDEX(reference)
     bamfile = BWA_ALIGNMENT(reads, BWA_INDEX.out.bwa_index.first())
-    VARIANT_CALLING(reference, bamfile.collect())
+    bamfile_sorted = SAMTOOLS_SORT(bamfile)
+    VARIANT_CALLING(reference.first(), bamfile_sorted)
     MULTIQC(fastqc.collect())
 }
 
@@ -61,6 +62,21 @@ process BWA_ALIGNMENT {
         | samtools view -b \
         > ${sample_id}.bam
     """
+}
+
+process SAMTOOLS_SORT {
+  tag "Sorting ${bamfile.getBaseName()}"
+
+  input:
+  file(bamfile)
+
+  output:
+  path("${bamfile.getBaseName()}.bam")
+
+  script:
+  """
+  samtools sort $bamfile -o ${bamfile.getBaseName()}.bam
+  """
 }
 
 process VARIANT_CALLING {
