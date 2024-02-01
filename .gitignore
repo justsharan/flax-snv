@@ -2,3 +2,4 @@ data/
 .nextflow*
 out/
 work/
+Phytozome/
