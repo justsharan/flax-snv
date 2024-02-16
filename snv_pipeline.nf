@@ -1,6 +1,6 @@
 params.reads = "$projectDir/data/*_{1,2}.fastq"
-params.genome = "$projectDir/Phytozome/PhytozomeV10/Lusitatissimum/assembly/Lusitatissimum_200_BGIv1.0.fa"
-params.annotation = "$projectDir/Phytozome/PhytozomeV10/Lusitatissimum/annotation/Lusitatissimum_200_v1.0.gene_exons.gff3"
+params.genome = "$projectDir/data/*.fasta"
+params.annotation = "$projectDir/data/*.gff3"
 params.outdir = "$projectDir/out"
 
 println """
