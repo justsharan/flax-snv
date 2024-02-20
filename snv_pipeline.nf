@@ -2,15 +2,18 @@ params.reads = "$projectDir/data/*_{1,2}.fastq"
 params.genome = "$projectDir/data/*.fasta"
 params.annotation = "$projectDir/data/*.gff3"
 params.outdir = "$projectDir/out"
+params.snpeff = "$projectDir/snpEff"
 
 println """
     Genome:     $params.genome
     WGS Reads:  $params.reads
     Annotation: $params.annotation
+    SnpEff:     $params.snpeff
     """.stripIndent()
 
 reads = Channel.fromFilePairs(params.reads, checkIfExists: true)
 reference = Channel.fromPath(params.genome, checkIfExists: true)
+snpeff = Channel.fromPath(params.snpeff, checkIfExists: true)
 
 workflow {
     fastqc = FASTQC(reads)
@@ -20,7 +23,9 @@ workflow {
     index_ref = SAMTOOLS_REF_INDEX(reference)
     vcffile = BCFTOOLS_CALL(index_ref.first(), bamfile)
     vcf_stats = BCFTOOLS_STATS(vcffile)
-    MULTIQC(fastqc.mix(bamfile_stats, vcf_stats).collect())
+    snpeff_db = BUILD_SNPEFF_DB(snpeff)
+    snpeff = SNPEFF_ANNOTATE(vcffile, snpeff_db.first())
+    MULTIQC(fastqc.mix(bamfile_stats, vcf_stats, snpeff).collect())
 }
 
 process FASTQC {
@@ -143,5 +148,36 @@ process BCFTOOLS_STATS {
     script:
     """
     bcftools stats $vcffile > ${vcffile.getBaseName()}.txt
+    """
+}
+
+process BUILD_SNPEFF_DB {
+    input:
+    path(snpEff)
+
+    output:
+    path(snpEff)
+
+    script:
+    """
+    java -jar $snpEff/snpEff.jar build -gff3 -v flax -noCheckCds -noCheckProtein
+    """
+}
+
+process SNPEFF_ANNOTATE {
+    tag "${vcffile.getSimpleName()}"
+    publishDir "$params.outdir/annotated", mode:"copy"
+
+    input:
+    path(vcffile)
+    path(snpEff)
+
+    output:
+    path("${vcffile.getSimpleName()}.ann.vcf.gz")
+    path("${vcffile.getSimpleName()}.csv")
+
+    script:
+    """
+    java -jar $snpEff/snpEff.jar flax $vcffile -csvStats ${vcffile.getSimpleName()}.csv > ${vcffile.getSimpleName()}.ann.vcf.gz
     """
 }
