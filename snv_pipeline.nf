@@ -3,8 +3,11 @@ params.genome = "$projectDir/data/*.fasta"
 params.annotation = "$projectDir/data/*.gff3"
 params.outdir = "$projectDir/out"
 params.snpeff = "$projectDir/snpEff"
+params.platform = "illumina"
 
 println """
+    F L A X    V A R I A N T S    P I P E L I N E
+    =============================================
     Genome:     $params.genome
     WGS Reads:  $params.reads
     Annotation: $params.annotation
@@ -16,16 +19,21 @@ reference = Channel.fromPath(params.genome, checkIfExists: true)
 snpeff = Channel.fromPath(params.snpeff, checkIfExists: true)
 
 workflow {
+    // Quality control on sequencing data
     fastqc = FASTQC(reads)
-    index = BUILD_BWA_INDEX(reference)
-    bamfile = BWA_ALIGN_SORT(reads, index.first())
-    bamfile_stats = BAMTOOLS_STATS(bamfile)
-    index_ref = SAMTOOLS_REF_INDEX(reference)
-    vcffile = BCFTOOLS_CALL(index_ref.first(), bamfile)
-    vcf_stats = BCFTOOLS_STATS(vcffile)
+    // Build bwa index for reference genome
+    index = BUILD_INDEX(reference)
+    // Align samples to reference
+    alignments = BWA_ALIGN_POSTPROCESS(reads, index.first())
+    // Call variants and merge
+    variants = BCFTOOLS_CALL(alignments, reference.first())
+    merged = BCFTOOLS_MERGE(variants.collect())
+    variant_stats = BCFTOOLS_STATS(variants)
+    // Annotate variants
     snpeff_db = BUILD_SNPEFF_DB(snpeff)
-    snpeff = SNPEFF_ANNOTATE(vcffile, snpeff_db.first())
-    MULTIQC(fastqc.mix(bamfile_stats, vcf_stats, snpeff).collect())
+    snpeff = SNPEFF_ANNOTATE(merged, snpeff_db.first())
+    // Generate report
+    MULTIQC(fastqc.mix(variant_stats, snpeff).collect())
 }
 
 process FASTQC {
@@ -58,9 +66,7 @@ process MULTIQC {
     """
 }
 
-process BUILD_BWA_INDEX {
-    publishDir "$params.outdir/bwa_index", mode:"copy"
-
+process BUILD_INDEX {
     input:
     path(genome)
 
@@ -70,65 +76,40 @@ process BUILD_BWA_INDEX {
     script:
     """
     bwa index $genome
+    samtools faidx $genome
     """
 }
 
-process BWA_ALIGN_SORT {
+process BWA_ALIGN_POSTPROCESS {
     tag "$sample_id"
+    publishDir "$params.outdir/bam", mode:"copy"
 
     input:
     tuple val(sample_id), path(reads)
     tuple path(genome), path("*")
 
     output:
-    path("${sample_id}.bam")
+    tuple val(sample_id), path("${sample_id}.bam")
 
     script:
     """
-    bwa mem -t $task.cpus $genome $reads | samtools sort -o ${sample_id}.bam
-    """
-}
-
-process BAMTOOLS_STATS {
-    tag "Getting stats on ${bamfile.getName()}"
-
-    input:
-    path(bamfile)
-
-    output:
-    path("${bamfile.getBaseName()}.txt")
-
-    script:
-    """
-    bamtools stats -in $bamfile > ${bamfile.getBaseName()}.txt
-    """
-}
-
-process SAMTOOLS_REF_INDEX {
-    tag "Building genome .fai"
-
-    input:
-    path(genome)
-
-    output:
-    tuple path(genome), path("${genome.getName()}.fai")
-
-    script:
-    """
-    samtools faidx $genome
+    bwa mem -t $task.cpus $genome $reads -r "@RG\\tID:$sample_id\\tPL:$params.platform\\tLB:$sample_id" \
+        | samblaster \
+        | samclip --ref $genome \
+        | samtools sort > ${sample_id}.bam
     """
 }
 
 process BCFTOOLS_CALL {
-    tag "${bamfile.getBaseName()}"
+    tag "$sample_id"
     publishDir "$params.outdir/vcf", mode:"copy"
 
     input:
-    tuple path(genome), path("*")
-    path(bamfile)
+    tuple val(sample_id), path(bamfile)
+    path(genome)
 
     output:
-    path("${bamfile.getBaseName()}.vcf.gz")
+    tuple val(sample_id), path("${sample_id}.vcf.gz")
 
     script:
     """
@@ -137,17 +118,31 @@ process BCFTOOLS_CALL {
 }
 
 process BCFTOOLS_STATS {
-    tag "Getting stats on ${vcffile.getName()}"
+    tag "$sample_id"
 
     input:
-    path(vcffile)
+    tuple val(sample_id), path(vcffile)
 
     output:
-    path("${vcffile.getBaseName()}.txt")
+    path("${sample_id}.txt")
 
     script:
     """
-    bcftools stats $vcffile > ${vcffile.getBaseName()}.txt
+    bcftools stats $vcffile > ${sample_id}.txt
+    """
+}
+
+process BCFTOOLS_MERGE {
+    publishDir params.outdir, mode:"copy"
+    input:
+    path("*")
+
+    output:
+    path("variants.vcf.gz")
+
+    script:
+    """
+    bcftools merge **/*.vcf.gz -o variants.vcf.gz
     """
 }
 
@@ -165,19 +160,19 @@ process BUILD_SNPEFF_DB {
 }
 
 process SNPEFF_ANNOTATE {
-    tag "${vcffile.getSimpleName()}"
-    publishDir "$params.outdir/annotated", mode:"copy"
+    tag "$sample_id"
+    publishDir params.outdir, mode:"copy"
 
     input:
     path(vcffile)
     path(snpEff)
 
     output:
-    path("${vcffile.getSimpleName()}.ann.vcf.gz")
-    path("${vcffile.getSimpleName()}.csv")
+    path("annotated.vcf.gz")
+    path("stats.csv")
 
     script:
     """
-    java -jar $snpEff/snpEff.jar flax $vcffile -csvStats ${vcffile.getSimpleName()}.csv > ${vcffile.getSimpleName()}.ann.vcf.gz
+    java -jar $snpEff/snpEff.jar flax $vcffile -csvStats stats.csv > annotated.vcf.gz
     """
 }
