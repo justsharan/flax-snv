@@ -27,7 +27,9 @@ workflow {
     alignments = BWA_ALIGN_POSTPROCESS(reads, index.first())
     // Call variants and merge
     variants = BCFTOOLS_CALL(alignments, reference.first())
-    merged = BCFTOOLS_MERGE(variants.collect())
+    index = BCFTOOLS_INDEX(variants)
+    merge_files = variants.map { v -> v[1] }.mix(index).collect()
+    merged = BCFTOOLS_MERGE(merge_files)
     variant_stats = BCFTOOLS_STATS(variants)
     // Annotate variants
     snpeff_db = BUILD_SNPEFF_DB(snpeff)
@@ -93,7 +95,7 @@ process BWA_ALIGN_POSTPROCESS {
 
     script:
     """
-    bwa mem -t $task.cpus $genome $reads -r "@RG\\tID:$sample_id\\tPL:$params.platform\\tLB:$sample_id" \
+    bwa mem -t $task.cpus $genome $reads -R "@RG\\tID:$sample_id\\tPL:$params.platform\\tLB:$sample_id" \
         | samblaster \
         | samclip --ref $genome \
         | samtools sort > ${sample_id}.bam
@@ -132,6 +134,21 @@ process BCFTOOLS_STATS {
     """
 }
 
+process BCFTOOLS_INDEX {
+    tag "$sample_id"
+
+    input:
+    tuple val(sample_id), path(vcffile)
+
+    output:
+    path("*.tbi")
+
+    script:
+    """
+    bcftools index --threads $task.cpus -t $vcffile
+    """
+}
+
 process BCFTOOLS_MERGE {
     publishDir params.outdir, mode:"copy"
     input:
@@ -142,7 +159,7 @@ process BCFTOOLS_MERGE {
 
     script:
     """
-    bcftools merge **/*.vcf.gz -o variants.vcf.gz
+    bcftools merge *.vcf.gz -o variants.vcf.gz
     """
 }
 
