@@ -1,6 +1,5 @@
 params.reads = "$projectDir/data/*_{1,2}.fastq"
 params.genome = "$projectDir/data/*.fasta"
-params.annotation = "$projectDir/data/*.gff3"
 params.outdir = "$projectDir/out"
 params.snpeff = "$projectDir/snpEff"
 params.platform = "illumina"
@@ -10,7 +9,6 @@ println """
     =============================================
     Genome:     $params.genome
     WGS Reads:  $params.reads
-    Annotation: $params.annotation
     SnpEff:     $params.snpeff
     """.stripIndent()
 
@@ -19,23 +17,15 @@ reference = Channel.fromPath(params.genome, checkIfExists: true)
 snpeff = Channel.fromPath(params.snpeff, checkIfExists: true)
 
 workflow {
-    // Quality control on sequencing data
     fastqc = FASTQC(reads)
-    // Build bwa index for reference genome
     index = BUILD_INDEX(reference)
-    // Align samples to reference
-    alignments = BWA_ALIGN_POSTPROCESS(reads, index.first())
-    // Call variants and merge
+    alignments = BWA_ALIGN(reads, index.first())
     variants = BCFTOOLS_CALL(alignments, reference.first())
-    index = BCFTOOLS_INDEX(variants)
-    merge_files = variants.map { v -> v[1] }.mix(index).collect()
-    merged = BCFTOOLS_MERGE(merge_files)
-    variant_stats = BCFTOOLS_STATS(variants)
-    // Annotate variants
+    variant_indexes = BCFTOOLS_INDEX(variants)
+    merged = variants.map { v -> v[1] }.mix(variant_indexes).collect() | BCFTOOLS_MERGE
     snpeff_db = BUILD_SNPEFF_DB(snpeff)
     snpeff = SNPEFF_ANNOTATE(merged, snpeff_db.first())
-    // Generate report
-    MULTIQC(fastqc.mix(variant_stats, snpeff).collect())
+    MULTIQC(fastqc.mix(BCFTOOLS_STATS(variants), snpeff).collect())
 }
 
 process FASTQC {
@@ -77,14 +67,14 @@ process BUILD_INDEX {
 
     script:
     """
-    bwa index $genome
+    bwa-mem2 index $genome
     samtools faidx $genome
     """
 }
 
-process BWA_ALIGN_POSTPROCESS {
+process BWA_ALIGN {
     tag "$sample_id"
-    publishDir "$params.outdir/bam", mode:"copy"
+    publishDir "$params.outdir/bam"
 
     input:
     tuple val(sample_id), path(reads)
@@ -95,16 +85,13 @@ process BWA_ALIGN_POSTPROCESS {
 
     script:
     """
-    bwa mem -t $task.cpus $genome $reads -R "@RG\\tID:$sample_id\\tPL:$params.platform\\tLB:$sample_id" \
-        | samblaster \
-        | samclip --ref $genome \
-        | samtools sort > ${sample_id}.bam
+    bwa-mem2 mem $genome $reads | samtools sort > ${sample_id}.bam
     """
 }
 
 process BCFTOOLS_CALL {
     tag "$sample_id"
-    publishDir "$params.outdir/vcf", mode:"copy"
+    publishDir "$params.outdir/vcf"
 
     input:
     tuple val(sample_id), path(bamfile)
@@ -115,7 +102,8 @@ process BCFTOOLS_CALL {
 
     script:
     """
-    bcftools mpileup -Ou -f $genome $bamfile | bcftools call -m -v --ploidy 2 -Ov -o ${bamfile.getBaseName()}.vcf.gz
+    bcftools mpileup -Ou -f $genome $bamfile \
+        | bcftools call -m -v --ploidy 2 -Ov -o ${sample_id}.vcf.gz
     """
 }
 
@@ -150,7 +138,7 @@ process BCFTOOLS_INDEX {
 }
 
 process BCFTOOLS_MERGE {
-    publishDir params.outdir, mode:"copy"
+    publishDir params.outdir
     input:
     path("*")
 
