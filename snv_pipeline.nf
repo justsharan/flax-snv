@@ -113,12 +113,12 @@ process BCFTOOLS_CALL {
     tuple path(genome), path("*")
 
     output:
-    tuple val(sample_id), path("${sample_id}.vcf.gz")
+    tuple val(sample_id), path("${sample_id}.bcf")
 
     script:
     """
     bcftools mpileup -Ou -a FORMAT/AD,FORMAT/DP,FORMAT/SP,INFO/AD -f $genome *.dedup.bam \
-        | bcftools call -f GQ,GP --ploidy 2 -m -Ob -o variants.vcf.gz
+        | bcftools call -f GQ,GP --ploidy 2 -m -Ob -o variants.bcf
     """
 }
 
@@ -163,6 +163,8 @@ process SNPEFF_ANNOTATE {
 
     script:
     """
-    java -jar $params.snpeff/snpEff.jar flax $vcffile -csvStats stats.csv > annotated.vcf.gz
+    bcftools convert -Ov -o variants.vcf $vcffile
+    java -jar $params.snpeff/snpEff.jar flax variants.vcf -csvStats stats.csv | gzip > annotated.vcf.gz
+    rm variants.vcf
     """
 }
