@@ -1,8 +1,8 @@
 params.reads = "$projectDir/data/*_{1,2}.fastq"
-params.genome = "$projectDir/data/*.fasta"
 params.outdir = "$projectDir/out"
 params.snpeff = "$projectDir/snpEff"
-params.platform = "illumina"
+params.genome = "$params.snpeff/data/flax/sequences.fa"
+params.platform = "DNBSEQ"
 
 println """
     F L A X    V A R I A N T S    P I P E L I N E
@@ -20,11 +20,9 @@ workflow {
     fastqc = FASTQC(reads)
     index = BUILD_INDEX(reference)
     alignments = BWA_ALIGN(reads, index.first())
-    variants = BCFTOOLS_CALL(alignments, reference.first())
-    variant_indexes = BCFTOOLS_INDEX(variants)
-    merged = variants.map { v -> v[1] }.mix(variant_indexes).collect() | BCFTOOLS_MERGE
-    snpeff_db = BUILD_SNPEFF_DB(snpeff)
-    snpeff = SNPEFF_ANNOTATE(merged, snpeff_db.first())
+    dedup = SAMTOOLS_PROCESS(alignments)
+    variants = BCFTOOLS_CALL(dedup.collect(), index.first())
+    snpeff = SNPEFF_ANNOTATE(variants, BUILD_SNPEFF_DB(snpeff).first())
     MULTIQC(fastqc.mix(BCFTOOLS_STATS(variants), snpeff).collect())
 }
 
@@ -85,25 +83,42 @@ process BWA_ALIGN {
 
     script:
     """
-    bwa-mem2 mem $genome $reads | samtools sort > ${sample_id}.bam
+    bwa-mem2 mem -R '@RG\\tID:$sample_id\\tPL:$params.platform\\tLB:$sample_id' $genome $reads | samtools sort > ${sample_id}.bam
+    """
+}
+
+process SAMTOOLS_PROCESS {
+    tag "$sample_id"
+
+    input:
+    tuple val(sample_id), path(bamfile)
+
+    output:
+    path("${sample_id}.dedup.bam")
+
+    script:
+    """
+    samtools collate -Ou $bamfile \
+        | samtools fixmate -m - - \
+        | samtools sort - - \
+        | samtools markdup -d 100 - ${sample_id}.dedup.bam
     """
 }
 
 process BCFTOOLS_CALL {
-    tag "$sample_id"
-    publishDir "$params.outdir/vcf"
+    publishDir params.outdir
 
     input:
-    tuple val(sample_id), path(bamfile)
-    path(genome)
+    path("*")
+    tuple path(genome), path("*")
 
     output:
     tuple val(sample_id), path("${sample_id}.vcf.gz")
 
     script:
     """
-    bcftools mpileup -Ou -f $genome $bamfile \
-        | bcftools call -m -v --ploidy 2 -Ov -o ${sample_id}.vcf.gz
+    bcftools mpileup -Ou -a FORMAT/AD,FORMAT/DP,FORMAT/SP,INFO/AD -f $genome *.dedup.bam \
+        | bcftools call -f GQ,GP --ploidy 2 -m -Ob -o variants.vcf.gz
     """
 }
 
@@ -119,35 +134,6 @@ process BCFTOOLS_STATS {
     script:
     """
     bcftools stats $vcffile > ${sample_id}.txt
-    """
-}
-
-process BCFTOOLS_INDEX {
-    tag "$sample_id"
-
-    input:
-    tuple val(sample_id), path(vcffile)
-
-    output:
-    path("*.tbi")
-
-    script:
-    """
-    bcftools index --threads $task.cpus -t $vcffile
-    """
-}
-
-process BCFTOOLS_MERGE {
-    publishDir params.outdir
-    input:
-    path("*")
-
-    output:
-    path("variants.vcf.gz")
-
-    script:
-    """
-    bcftools merge *.vcf.gz -o variants.vcf.gz
     """
 }
 
@@ -170,7 +156,6 @@ process SNPEFF_ANNOTATE {
 
     input:
     path(vcffile)
-    path(snpEff)
 
     output:
     path("annotated.vcf.gz")
@@ -178,6 +163,6 @@ process SNPEFF_ANNOTATE {
 
     script:
     """
-    java -jar $snpEff/snpEff.jar flax $vcffile -csvStats stats.csv > annotated.vcf.gz
+    java -jar $params.snpeff/snpEff.jar flax $vcffile -csvStats stats.csv > annotated.vcf.gz
     """
 }
