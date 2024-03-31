@@ -10,4 +10,4 @@ bcftools filter -Oz -e "INFO/DP>2.5*AVG(INFO/DP) & QUAL<30 & MQ<30 & SP>3" remov
 java -jar $snpEff/snpEff.jar flax filtered.vcf.gz -csvStats stats.csv | gzip > annotated.vcf.gz
 
 # Filter for HIGH or MODERATE variants
-java -jar $snpEff/SnpSift.jar filter "(ANN[*].IMPACT has 'HIGH') | (ANN[*].IMPACT has 'MODERATE')" annotated.vcf.gz | gzip > high_moderatre.vcf.gz
+java -jar $snpEff/SnpSift.jar filter "(ANN[*].IMPACT has 'HIGH') | (ANN[*].IMPACT has 'MODERATE')" annotated.vcf.gz | gzip > high_moderate.vcf.gz
