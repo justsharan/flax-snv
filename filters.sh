@@ -11,3 +11,5 @@ java -jar $snpEff/snpEff.jar flax filtered.vcf.gz -csvStats stats.csv | gzip > a
 
 # Filter for HIGH or MODERATE variants
 java -jar $snpEff/SnpSift.jar filter "(ANN[*].IMPACT has 'HIGH') | (ANN[*].IMPACT has 'MODERATE')" annotated.vcf.gz | gzip > high_moderate.vcf.gz
+java -jar $snpEff/SnpSift.jar filter "ANN[*].IMPACT = 'HIGH'" high_moderate.vcf.gz | gzip > high.vcf.gz
+java -jar $snpEff/SnpSift.jar filter "ANN[*].IMPACT = 'MODERATE'" high_moderate.vcf.gz | gzip > moderate.vcf.gz
