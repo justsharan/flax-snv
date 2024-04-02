@@ -8,8 +8,25 @@ vcf.cols <- c("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FOR
 hard.filtered.variants <- read_tsv("filtered.vcf.gz", comment = "#", col_names = vcf.cols)
 # VCF file for high/moderate variants
 high.moderate.variants <- read_tsv("high_moderate.vcf.gz", comment = "#", col_names = vcf.cols)
+# VCF file for all variants
+all.variants <- read_tsv("variants_subset.vcf.gz", comment="#", col_names = vcf.cols) |>
+    filter(str_length(REF) == 1, str_length(ALT) == 1)
 
 ## PLOTTING
+
+all.snps <- all.variants |>
+    mutate(Type = paste(REF, ">", ALT, sep = "")) |>
+    count(Type) |>
+    mutate(Prop = n / sum(n)) |>
+    ggplot(aes(x = reorder(Type, -Prop), y = Prop)) +
+        geom_bar(stat = "identity") +
+        labs(x = "SNP Type", y = "Relative Frequency") +
+        labs(
+            title = "All Variants (Subsampled)",
+            subtitle = paste("n =", formatC(nrow(all.variants), format="d", big.mark=","))
+        ) +
+        scale_y_continuous(labels = scales::percent) +
+        theme_classic()
 
 hard.filtered.snps <- hard.filtered.variants |>
     mutate(Type = paste(REF, ">", ALT, sep = "")) |>
@@ -18,24 +35,34 @@ hard.filtered.snps <- hard.filtered.variants |>
     ggplot(aes(x = reorder(Type, -Prop), y = Prop)) +
         geom_bar(stat = "identity") +
         labs(x = "SNP Type", y = "Relative Frequency") +
-        ggtitle("All Filtered Variants") +
+        labs(
+            title = "All Filtered Variants",
+            subtitle = paste("n =", formatC(nrow(hard.filtered.variants), format="d", big.mark=","))
+        ) +
         scale_y_continuous(labels = scales::percent) +
         theme_classic()
 
 high.moderate.snps <- high.moderate.variants |>
-    mutate(Type = paste(REF, ">", ALT, sep = "")) |>
-    count(Type) |>
+    mutate(
+        Type = paste(REF, ">", ALT, sep = ""),
+        Impact = ifelse(str_detect(INFO, "HIGH"), "High", "Moderate")
+    ) |>
+    count(Type, Impact) |>
     mutate(Prop = n / sum(n)) |>
-    ggplot(aes(x = reorder(Type, -Prop), y = Prop)) +
+    ggplot(aes(x = reorder(Type, -Prop), y = Prop, fill = Impact)) +
         geom_bar(stat = "identity") +
         labs(x = "SNP Type", y = "Relative Frequency") +
-        ggtitle("High and Moderate Impact Variants") +
+        labs(
+            title = "High and Moderate Impact Variants",
+            subtitle = paste("n =", formatC(nrow(high.moderate.variants), format="d", big.mark=","))
+        ) +
         scale_y_continuous(labels = scales::percent) +
+        scale_fill_grey() +
         theme_classic()
 
 # Render bar plots
-hard.filtered.snps + high.moderate.snps
-ggsave("snp_type.jpg", hard.filtered.snps + high.moderate.snps, width = 9, height = 6)
+all.snps + hard.filtered.snps + high.moderate.snps
+ggsave("snp_type.jpg", all.snps + hard.filtered.snps + high.moderate.snps, width = 15, height = 6)
 
 # Generate SNP Density Plot
 hard.filtered.variants |>
