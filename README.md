@@ -25,20 +25,15 @@ cd flax-snv
 
 2. Install and setup SnpEff
 
-[SnpEff](https://pcingola.github.io/SnpEff/) is the tool I have used to integrate the variant calling data with genomic information and annotate the vcf file. It can be installed as such. The `-n` flag preserves the config I have included in this repository.
+[SnpEff](https://pcingola.github.io/SnpEff/) is the tool I have used to annotate the variant data with genomic information. It can be installed as such. The `-n` flag preserves the config I have included in this repository.
 
 ```sh
 wget https://snpeff.blob.core.windows.net/versions/snpEff_latest_core.zip
 unzip -n snpEff_latest_core.zip
-```
-
-3. Provide flax FASTA files for SnpEff
-
-```sh
 mkdir -p snpEff/data/flax/
 ```
 
-In that location, SnpEff expects 4 files with these exact filenames. The content of the files is self-explanatory.
+In that location, SnpEff expects 4 files **with these exact filenames and extensions**. The content of the files is self-explanatory.
 * `cds.fa`
 * `genes.gff`
 * `protein.fa`
@@ -52,7 +47,7 @@ My pipeline also uses the `sequences.fa` file as the reference for aligning the 
 
 4. Install dependencies
 
-This pipeline requires the following dependencies:
+This pipeline has the following dependencies:
 * nextflow
 * fastqc
 * multiqc
