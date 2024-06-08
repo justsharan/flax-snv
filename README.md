@@ -1,4 +1,4 @@
-This repository contains a pipeline and some data analysis scripts I've written for a variant calling project on EMS-mutagenized flax. Here are some instructions on how to run the pipeline.
+This repository contains a pipeline and some data analysis scripts I've written for a variant calling project on EMS-mutagenized flax. Here are some instructions on how to execute the pipeline.
 
 ## Setup
 
@@ -57,13 +57,13 @@ conda activate flaxsnv
 
 > It is recommended to run this within `tmux`.
 
-The basic command is `nextflow run snv_pipeline.nf`. It takes the following commands:
+The basic command is `nextflow run snv_pipeline.nf`. It takes the following custom arguments:
 
 |Option|Default|Description|
 |:-----|:------|:----------|
-|`reads`|`$PWD/data/*_{1,2}.fastq`|The location of the WGS reads. The default option looks at all paired-end reads in the data folder. For example, `V350170890_L03_102_1.fastq` and `V350170890_L03_102_2.fastq` will be grouped together.|
+|`reads`|`$PWD/data/*_{1,2}.fastq`|The location of the WGS reads. The default option looks at all paired-end reads in the data folder. For example, `SRR12345_1.fastq` and `SRR12345_2.fastq` will be grouped together.|
 |`outdir`|`$PWD/out`|The output directory|
-|`snpeff`|`$PWD/snpeff`|The location of the SnpEff install. Must include the config file and data directory as specified in setup.|
+|`snpeff`|`$PWD/snpEff`|The location of the SnpEff install. Must include the config file and data directory as specified in setup.|
 |`genome`|`$snpeff/data/flax/sequences.fa`|The reference genome to align the sequences to. Uses the `sequences.fa` file from the SnpEff setup.|
 |`platform`|`DNBSEQ`|Used in the read groups of the alignment files. Necessary for processing of alignment files by samtools. [[Read more]](https://samtools.github.io/hts-specs/SAMv1.pdf)|
 
@@ -73,7 +73,7 @@ These can be passed in as arguments to the nextflow command. To change the locat
 nextflow run snv_pipeline.nf --reads "some/other/path/*_{1,2}.fq.gz"
 ```
 
-Other options you may find useful:
+Other built-in Nextflow options you may find useful:
 
 * `-preview`: Perform a dry run of the pipeline. Useful to check if your pipeline code has any syntax issues.
 * `-with-dag`: Produce a flowchart of the different pipeline steps.
@@ -81,6 +81,3 @@ Other options you may find useful:
 * `-with-timeline`: Produce a timeline of when each command was ran and how long it took.
 
 [[More info]](https://www.nextflow.io/docs/latest/tracing.html)
-
-What the pipeline looks like while being run:
-![Image of nextflow pipeline in progress](nextflow.webp)
