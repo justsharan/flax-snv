@@ -4,6 +4,5 @@ out/
 work/
 Phytozome/
 *.html
-snpEff/
 *.vcf.gz
 *.jpg

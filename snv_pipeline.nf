@@ -22,7 +22,7 @@ workflow {
     alignments = BWA_ALIGN(reads, index.first())
     dedup = SAMTOOLS_PROCESS(alignments)
     variants = BCFTOOLS_CALL(dedup.collect(), index.first())
-    snpeff = SNPEFF_ANNOTATE(variants, BUILD_SNPEFF_DB(snpeff).first())
+    snpeff = SNPEFF_ANNOTATE(variants)
     MULTIQC(fastqc.mix(BCFTOOLS_STATS(variants), snpeff).collect())
 }
 
