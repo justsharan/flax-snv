@@ -1,5 +1,19 @@
 This repository contains a pipeline and some data analysis scripts I've written for a variant calling project on EMS-mutagenized flax. Here are some instructions on how to execute the pipeline.
 
+## About
+
+These are the following steps:
+
+* `FASTQC`: collects qc metrics on the raw WGS reads.
+* `BWA_INDEX`: builds a BWA index for the reference genome to be used in alignment.
+* `BWA_ALIGN`: aligns each pair of reads to the reference from BWA_INDEX. Runs multiple samples in parallel.
+* `SAMTOOLS_PROCESS`: sorts reads by both read name and genome position and fills in missing information among paired reads. Then marks PCR duplicates. Each sample immediately goes into this step after being aligned.
+* `BCFTOOLS_CALL`: calls variants using bcftools mpileup and call. All samples are called together after processing. Produces a single bcf file containing information on all samples.
+* `BUILD_SNPEFF_DB`: builds a database for SnpEff to use in annotations.
+* `SNPEFF_ANNOTATE`: anntoates the single bcf file produced after variant calling.
+* `BCFTOOLS_STATS`: collects metrics on the variants.
+* `MULTIQC`: produces an HTML report containing all information.
+
 ## Setup
 
 1. Clone the repository
