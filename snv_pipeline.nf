@@ -22,7 +22,7 @@ workflow {
     alignments = BWA_ALIGN(reads, index.first())
     dedup = SAMTOOLS_PROCESS(alignments)
     variants = BCFTOOLS_CALL(dedup.collect(), index.first())
-    snpeff = SNPEFF_ANNOTATE(variants)
+    snpeff = SNPEFF_ANNOTATE(variants, BUILD_SNPEFF_DB(snpeff))
     MULTIQC(fastqc.mix(BCFTOOLS_STATS(variants), snpeff).collect())
 }
 
@@ -156,6 +156,7 @@ process SNPEFF_ANNOTATE {
 
     input:
     path(vcffile)
+    path(snpEff)
 
     output:
     path("annotated.vcf.gz")
@@ -164,7 +165,7 @@ process SNPEFF_ANNOTATE {
     script:
     """
     bcftools convert -Ov -o variants.vcf $vcffile
-    java -jar $params.snpeff/snpEff.jar flax variants.vcf -csvStats stats.csv | gzip > annotated.vcf.gz
+    java -jar $snpEff/snpEff.jar flax variants.vcf -csvStats stats.csv | gzip > annotated.vcf.gz
     rm variants.vcf
     """
 }

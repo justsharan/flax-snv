@@ -41,11 +41,11 @@ In that location, SnpEff expects 4 files **with these exact filenames and extens
 
 For this project in particular, the requisite files were obtained from these sources:
 * https://phytozome-next.jgi.doe.gov/info/Lusitatissimum_v1_0
-* You, F. M., Xiao, J., Li, P., Yao, Z., Jia, G., He, L., Zhu, T., Luo, M. C., Wang, X., Deyholos, M. K., & Cloutier, S. (2018). Chromosome-scale pseudomolecules refined by optical, physical and genetic maps in flax. The *Plant journal : for cell and molecular biology*, *95*(2), 371–384. https://doi.org/10.1111/tpj.13944
+* You, F. M., Xiao, J., Li, P., Yao, Z., Jia, G., He, L., Zhu, T., Luo, M. C., Wang, X., Deyholos, M. K., & Cloutier, S. (2018). Chromosome-scale pseudomolecules refined by optical, physical and genetic maps in flax. *The Plant journal : for cell and molecular biology*, *95*(2), 371–384. https://doi.org/10.1111/tpj.13944
 
 My pipeline also uses the `sequences.fa` file as the reference for aligning the WGS reads. This behavior can be changed.
 
-4. Install dependencies
+3. Install dependencies
 
 This pipeline has the following dependencies:
 * nextflow
