@@ -6,3 +6,5 @@ Phytozome/
 *.html
 *.vcf.gz
 *.jpg
+snpEff/*
+!snpEff/snpEff.config
