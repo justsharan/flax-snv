@@ -5,11 +5,11 @@ library(patchwork)
 vcf.cols <- c("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", 1:61)
 
 # VCF file after hard filtering
-hard.filtered.variants <- read_tsv("filtered.vcf.gz", comment = "#", col_names = vcf.cols)
+hard.filtered.variants <- read_tsv("out/quality_filters.vcf.gz", comment = "#", col_names = vcf.cols)
 # VCF file for high/moderate variants
-high.moderate.variants <- read_tsv("high_moderate.vcf.gz", comment = "#", col_names = vcf.cols)
+high.moderate.variants <- read_tsv("out/high_and_moderate.vcf.gz", comment = "#", col_names = vcf.cols)
 # VCF file for all variants
-all.variants <- read_tsv("variants_subset.vcf.gz", comment="#", col_names = vcf.cols) |>
+all.variants <- read_tsv("out/variants_subset.vcf.gz", comment="#", col_names = vcf.cols) |>
     filter(str_length(REF) == 1, str_length(ALT) == 1)
 
 ## PLOTTING

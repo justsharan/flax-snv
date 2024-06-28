@@ -10,22 +10,12 @@ ortholog.cols <- c("Transcript.ID", "Gene", "Transcript.Name", "Protein.Name", "
 orthologs <- read_tsv("Lusitatissimum_200_annotation_info.txt.gz", col_names = ortholog.cols) |>
     mutate(Transcript.ID = paste("PAC:", Transcript.ID, sep=""))
 
-high.tsv <- read_tsv("high.tsv", skip = 1, col_names = tsv.cols) |>
+high.tsv <- read_tsv("out/high.tsv", skip = 1, col_names = tsv.cols) |>
     mutate(Ref = paste(Ref, ">", Alt, sep="")) |>
     rename(Change = Ref) |>
     select(-Alt)
 
-joined <- high.tsv |>
+high.tsv |>
     inner_join(orthologs, by=c("Gene", "Transcript.ID")) |>
-    mutate(across(all_of(samples), function(s) str_match(s, "^(\\d/\\d):")[,2]))
-
-# Not part of analysis
-# Left join shows that some genes have many-to-many relationships...
-# makes sense in TSV file but why phytozome?
-# Figure out which genes are duplicated in phytozome data
-orthologs |>
-    group_by(Gene) |>
-    filter(n() > 1) |>
-    View()
-
-write_csv(joined, "annotated.csv")
+    mutate(across(all_of(samples), function(s) str_match(s, "^(\\d/\\d):")[,2])) |>
+    write_csv("annotated.csv")
