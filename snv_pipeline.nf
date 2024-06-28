@@ -23,6 +23,7 @@ workflow {
     dedup = SAMTOOLS_PROCESS(alignments)
     variants = BCFTOOLS_CALL(dedup.collect(), index.first())
     snpeff = SNPEFF_ANNOTATE(variants, BUILD_SNPEFF_DB(snpeff))
+    SNV_FILTERING(snpeff)
     MULTIQC(fastqc.mix(BCFTOOLS_STATS(variants), snpeff).collect())
 }
 
@@ -100,7 +101,7 @@ process SAMTOOLS_PROCESS {
     """
     samtools collate -Ou $bamfile \
         | samtools fixmate -m - - \
-        | samtools sort - - \
+        | samtools sort - -o - \
         | samtools markdup -d 100 - ${sample_id}.dedup.bam
     """
 }
@@ -113,27 +114,25 @@ process BCFTOOLS_CALL {
     tuple path(genome), path("*")
 
     output:
-    tuple val(sample_id), path("${sample_id}.bcf")
+    path("variants.vcf.gz")
 
     script:
     """
     bcftools mpileup -Ou -a FORMAT/AD,FORMAT/DP,FORMAT/SP,INFO/AD -f $genome *.dedup.bam \
-        | bcftools call -f GQ,GP --ploidy 2 -m -Ob -o variants.bcf
+        | bcftools call -f GQ,GP --ploidy 2 -m -Oz -o variants.vcf.gz
     """
 }
 
 process BCFTOOLS_STATS {
-    tag "$sample_id"
-
     input:
-    tuple val(sample_id), path(vcffile)
+    path(vcffile)
 
     output:
-    path("${sample_id}.txt")
+    path("stats.txt")
 
     script:
     """
-    bcftools stats $vcffile > ${sample_id}.txt
+    bcftools stats $vcffile > stats.txt
     """
 }
 
@@ -151,7 +150,6 @@ process BUILD_SNPEFF_DB {
 }
 
 process SNPEFF_ANNOTATE {
-    tag "$sample_id"
     publishDir params.outdir, mode:"copy"
 
     input:
@@ -167,5 +165,22 @@ process SNPEFF_ANNOTATE {
     bcftools convert -Ov -o variants.vcf $vcffile
     java -jar $snpEff/snpEff.jar flax variants.vcf -csvStats stats.csv | gzip > annotated.vcf.gz
     rm variants.vcf
+    """
+}
+
+process SNV_FILTERING {
+    publishDir params.outdir, mode:"copy"
+
+    input:
+    path("annotated.vcf.gz")
+    path("stats.csv")
+
+    output:
+    path("*.vcf.gz")
+
+    script:
+    """
+    export snpEff=${params.snpeff}
+    $projectDir/filters.sh annotated.vcf.gz
     """
 }

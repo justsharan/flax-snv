@@ -2,15 +2,16 @@ This repository contains a pipeline and some data analysis scripts I've written 
 
 ## About
 
-These are the following steps:
+These are the following steps in the pipeline:
 
 * `FASTQC`: collects qc metrics on the raw WGS reads.
 * `BWA_INDEX`: builds a BWA index for the reference genome to be used in alignment.
-* `BWA_ALIGN`: aligns each pair of reads to the reference index. Runs multiple samples in parallel.
+* `BWA_ALIGN`: aligns each pair of reads to the reference. Runs multiple samples in parallel.
 * `SAMTOOLS_PROCESS`: sorts reads by both read name and genome position and fills in missing information among paired reads. Then marks PCR duplicates. Each sample immediately goes into this step after being aligned.
 * `BCFTOOLS_CALL`: calls variants using bcftools mpileup and call. All samples are called together after processing. Produces a single bcf file containing information on all samples.
 * `BUILD_SNPEFF_DB`: builds a database for SnpEff to use in variant annotation.
 * `SNPEFF_ANNOTATE`: anntoates the single bcf file produced after variant calling.
+* `SNV_FILTERING`: Runs [filters.sh](./filters.sh) on the VCF file annotated by SnpEff. This script removes INDELs, applies hard filters based on quality scores, and creates separate files for high and moderate variants for downstream analyses.
 * `BCFTOOLS_STATS`: calculates metrics on the variants.
 * `MULTIQC`: produces an HTML report containing all information.
 
@@ -48,17 +49,18 @@ My pipeline also uses the `sequences.fa` file as the reference for aligning the 
 3. Install dependencies
 
 This pipeline has the following dependencies:
-* nextflow
+* bcftools
+* bwa-mem2
 * fastqc
 * multiqc
-* bwa-mem2
+* nextflow
 * samtools
-* bcftools
+* vcflib=1.0.3
 
 If you are using conda, you can do the following:
 
 ```sh
-conda create -n flaxsnv nextflow fastqc multiqc bwa-mem2 samtools bcftools
+conda create -n flaxsnv bcftools bwa-mem2 fastqc multiqc nextflow samtools vcflib=1.0.3
 conda activate flaxsnv
 ```
 
